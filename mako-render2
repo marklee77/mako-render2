@@ -1,0 +1,55 @@
+#!/usr/bin/python
+
+def render(data, template_path, meta):
+    from mako.template import Template
+    from mako.lookup import TemplateLookup
+
+    lookup = TemplateLookup(template_path)
+    return Template(data, lookup=lookup).render(meta=meta)
+
+def main(argv=None):
+    from os.path import isfile
+    from sys import stdin
+
+    if argv is None:
+        import sys
+        argv = sys.argv
+
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser(description="Render a Mako template.")
+    parser.add_argument('-t', '--template')
+    parser.add_argument('-tp', '--template_path')
+    parser.add_argument('-m', '--meta')
+    parser.add_argument('-i', '--inherit')
+
+    args = parser.parse_args()
+
+    if (not args.template or args.template == "-"):
+        fo = stdin
+    else:
+        filename = args.template
+        if not isfile(filename):
+            raise SystemExit("error: can't find %s" % filename)
+        fo = open(filename)
+
+    if not args.template_path:
+        template_path = ['.']
+    else:
+        template_path = args.template_path.split(':')
+
+    if not args.meta:
+        meta = dict()
+    else:
+        import json
+        meta = json.loads(args.meta)
+        
+    data = fo.read()
+
+    if args.inherit:
+        data = '<%inherit file="' + args.inherit + '" />' + data
+
+    print render(data, template_path, meta)
+
+if __name__ == "__main__":
+    main()
