@@ -22,6 +22,8 @@ def main(argv=None):
     parser.add_argument('-t', '--template', default='-', help='file to render')
     parser.add_argument('-tp', '--template_path', default='.', help='template search path')
     parser.add_argument('-m', '--meta', help='meta data file in yaml format')
+    parser.add_argument('-v', '--var', action='append', 
+        help='name:value pair to be added to meta')
     parser.add_argument('-i', '--inherit', 
         help='inheritence for static documents')
     parser.add_argument('-o', '--output', help='output file')
@@ -53,14 +55,19 @@ def main(argv=None):
         metafile.close()
     else:
         meta = dict()
+
+    # FIXME: add fix for \:...
+    for pair in args.var:
+        name, value = pair.split(':')
+        meta[name] = value
         
+    meta['charset'] = args.output_encoding
+
     if args.output:
         out = open(args.output, 'w')
     else:
         out = stdout
  
-    meta['charset'] = args.output_encoding
-
     data = fo.read()
 
     if args.inherit:
