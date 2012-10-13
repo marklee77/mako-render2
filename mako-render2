@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-def render(data, template_path, meta):
+def render(data, template_path, meta, input_encoding, output_encoding):
     from mako.template import Template
     from mako.lookup import TemplateLookup
 
     lookup = TemplateLookup(template_path)
-    return Template(data, lookup=lookup, input_encoding='utf-8',
-        output_encoding='utf-8').render(meta=meta)
+    return Template(data, lookup=lookup, input_encoding=input_encoding,
+        output_encoding=output_encoding).render(meta=meta)
 
 def main(argv=None):
     from os.path import isfile
@@ -20,11 +20,15 @@ def main(argv=None):
 
     parser = ArgumentParser(description="Render a Mako template.")
     parser.add_argument('-t', '--template', default='-', help='file to render')
-    parser.add_argument('-tp', '--template_path', help='template search path')
+    parser.add_argument('-tp', '--template_path', default='.', help='template search path')
     parser.add_argument('-m', '--meta', help='meta data file in yaml format')
     parser.add_argument('-i', '--inherit', 
         help='inheritence for static documents')
     parser.add_argument('-o', '--output', help='output file')
+    parser.add_argument('-ienc', '--input_encoding', default='utf-8',
+        help='input encoding')
+    parser.add_argument('-oenc', '--output_encoding', default='utf-8',
+        help='output encoding')
 
     args = parser.parse_args()
 
@@ -36,10 +40,7 @@ def main(argv=None):
             raise SystemExit("error: can't find %s" % filename)
         fo = open(filename)
 
-    if not args.template_path:
-        template_path = ['.']
-    else:
-        template_path = args.template_path.split(':')
+    template_path = args.template_path.split(':')
 
     if args.meta:
         import yaml
@@ -58,12 +59,14 @@ def main(argv=None):
     else:
         out = stdout
  
+    meta['charset'] = args.output_encoding
+
     data = fo.read()
 
     if args.inherit:
         data = '<%inherit file="' + args.inherit + '" />' + data
 
-    out.write(render(data, template_path, meta))
+    out.write(render(data, template_path, meta, args.input_encoding, args.output_encoding))
 
 if __name__ == "__main__":
     main()
