@@ -5,11 +5,12 @@ def render(data, template_path, meta):
     from mako.lookup import TemplateLookup
 
     lookup = TemplateLookup(template_path)
-    return Template(data, lookup=lookup).render(meta=meta)
+    return Template(data, lookup=lookup, input_encoding='utf-8',
+        output_encoding='utf-8').render(meta=meta)
 
 def main(argv=None):
     from os.path import isfile
-    from sys import stdin
+    from sys import stdin, stdout
 
     if argv is None:
         import sys
@@ -18,14 +19,16 @@ def main(argv=None):
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description="Render a Mako template.")
-    parser.add_argument('-t', '--template')
-    parser.add_argument('-tp', '--template_path')
-    parser.add_argument('-m', '--meta')
-    parser.add_argument('-i', '--inherit')
+    parser.add_argument('-t', '--template', default='-', help='file to render')
+    parser.add_argument('-tp', '--template_path', help='template search path')
+    parser.add_argument('-m', '--meta', help='meta data file in yaml format')
+    parser.add_argument('-i', '--inherit', 
+        help='inheritence for static documents')
+    parser.add_argument('-o', '--output', help='output file')
 
     args = parser.parse_args()
 
-    if (not args.template or args.template == "-"):
+    if (args.template == "-"):
         fo = stdin
     else:
         filename = args.template
@@ -38,18 +41,29 @@ def main(argv=None):
     else:
         template_path = args.template_path.split(':')
 
-    if not args.meta:
-        meta = dict()
+    if args.meta:
+        import yaml
+        try:
+            from yaml import CLoader as Loader
+        except ImportError:
+            from yaml import Loader
+        metafile = open(args.meta, 'r')
+        meta = yaml.load(metafile, Loader=Loader)
+        metafile.close()
     else:
-        import json
-        meta = json.loads(args.meta)
+        meta = dict()
         
+    if args.output:
+        out = open(args.output, 'w')
+    else:
+        out = stdout
+ 
     data = fo.read()
 
     if args.inherit:
         data = '<%inherit file="' + args.inherit + '" />' + data
 
-    print render(data, template_path, meta)
+    out.write(render(data, template_path, meta))
 
 if __name__ == "__main__":
     main()
