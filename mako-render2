@@ -96,7 +96,7 @@ def main(argv=None):
                data = md.convert(data)
                print md.Meta
                for key in md.Meta:
-                   meta[key] = md.Meta[key][-1] # FIXME? only last value
+                   meta[key] = " ".join(md.Meta[key])
 
     if extends:
         data = '<%inherit file="' + extends + '" />' + data
