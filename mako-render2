@@ -1,10 +1,10 @@
 #!/usr/bin/python
 
-def render(data, template_path, meta, input_encoding, output_encoding):
+def render(data, path, meta, input_encoding, output_encoding):
     from mako.template import Template
     from mako.lookup import TemplateLookup
 
-    lookup = TemplateLookup(template_path)
+    lookup = TemplateLookup(path)
     return Template(data, lookup=lookup, input_encoding=input_encoding,
         output_encoding=output_encoding).render(meta=meta)
 
@@ -18,15 +18,25 @@ def main(argv=None):
 
     from argparse import ArgumentParser
 
+    import yaml
+
+    try:
+        from yaml import CLoader as Loader
+    except ImportError:
+        from yaml import Loader
+    
     parser = ArgumentParser(description="Render a Mako template.")
-    parser.add_argument('-t', '--template', default='-', help='file to render')
-    parser.add_argument('-tp', '--template_path', default='.', help='template search path')
-    parser.add_argument('-m', '--meta', help='meta data file in yaml format')
+    parser.add_argument('-i', '--inputfile', default='-', help='input file')
+    parser.add_argument('-f', '--filters', action='append', 
+        help='list of filters to apply to input')
+    parser.add_argument('-t', '--template', help='template')
+    parser.add_argument('-tp', '--template_path', default='.', 
+        help=': delimited template search path')
+    parser.add_argument('-m', '--metafile', action='append',
+        help='metadata file in yaml format')
     parser.add_argument('-v', '--var', action='append', 
-        help='name:value pair to be added to meta')
-    parser.add_argument('-i', '--inherit', 
-        help='inheritence for static documents')
-    parser.add_argument('-o', '--output', help='output file')
+        help='name:value pair to be added to metadata')
+    parser.add_argument('-o', '--outputfile', help='output file')
     parser.add_argument('-ienc', '--input_encoding', default='utf-8',
         help='input encoding')
     parser.add_argument('-oenc', '--output_encoding', default='utf-8',
@@ -34,46 +44,78 @@ def main(argv=None):
 
     args = parser.parse_args()
 
-    if (args.template == "-"):
-        fo = stdin
+    stdincount = 0;
+    if args.inputfile == "-":
+        stdincount += 1
+    if args.template == "-":
+        stdincount += 1
+    if args.metafile and "-" in args.metafile:
+        stdincount += 1
+    if stdincount > 1:
+        raise SystemExit("error: only one of [inputfile], <template>, or " +
+            "[metafile] can be stdin")
+
+    if args.template == "-":
+        raise SystemExit("error: reading <template> from stdin not yet " +
+            + "supported")
+
+    fname = args.inputfile
+
+    if args.template:
+        extends = args.template
     else:
-        filename = args.template
-        if not isfile(filename):
-            raise SystemExit("error: can't find %s" % filename)
-        fo = open(filename)
+        extends = None
+
+    if (fname == "-"):
+        fo = stdin
+    elif isfile(fname):
+        fo = open(fname)
+    else:
+        raise SystemExit("error: can't find %s" % fname)
+
+    data = fo.read()
+
+    meta = dict()
+    meta['charset'] = args.output_encoding
+
+    if args.metafile:
+        for metafile in args.metafile:
+            metafp = open(metafile, 'r')
+            meta.update(yaml.load(metafp, Loader=Loader))
+            metafp.close()
+
+    if args.filters:
+       filters = []
+       for filterlist in args.filters:
+           filters.extend(filterlist.split(','))
+
+       for filter in filters:
+           if filter in ['md', 'markdown']:
+               import markdown
+               md = markdown.Markdown(output_format='html5', extensions=['meta'])
+               data = md.convert(data)
+               print md.Meta
+               for key in md.Meta:
+                   meta[key] = md.Meta[key][-1] # FIXME? only last value
+
+    if extends:
+        data = '<%inherit file="' + extends + '" />' + data
 
     template_path = args.template_path.split(':')
 
-    if args.meta:
-        import yaml
-        try:
-            from yaml import CLoader as Loader
-        except ImportError:
-            from yaml import Loader
-        metafile = open(args.meta, 'r')
-        meta = yaml.load(metafile, Loader=Loader)
-        metafile.close()
-    else:
-        meta = dict()
-
     # FIXME: add fix for \:...
-    for pair in args.var:
-        name, value = pair.split(':')
-        meta[name] = value
-        
-    meta['charset'] = args.output_encoding
+    if args.var:
+        for pair in args.var:
+            name, value = pair.split(':')
+            meta[name] = value
 
-    if args.output:
-        out = open(args.output, 'w')
+    if args.outputfile and args.outputfile != '-':
+        out = open(args.outputfile, 'w')
     else:
         out = stdout
- 
-    data = fo.read()
 
-    if args.inherit:
-        data = '<%inherit file="' + args.inherit + '" />' + data
-
-    out.write(render(data, template_path, meta, args.input_encoding, args.output_encoding))
+    out.write(render(data, template_path, meta, args.input_encoding,
+        args.output_encoding))
 
 if __name__ == "__main__":
     main()
