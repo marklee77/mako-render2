@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-def render(data, meta):
+def render_mako(data, meta):
     from mako.template import Template
     from mako.lookup import TemplateLookup
 
@@ -9,19 +9,37 @@ def render(data, meta):
 
     lookup = TemplateLookup(meta['template_dirs'])
 
-    return Template(data, lookup=lookup, input_encoding=meta['input_encoding'],
-        output_encoding=meta['output_encoding']).render(meta=meta)
+    template = Template(data, lookup=lookup, 
+    input_encoding=meta['input_encoding'], 
+    output_encoding=meta['output_encoding'])
+
+    return template.render(meta=meta)
+
+def render_jinja2(data, meta):
+    from jinja2 import Environment, FileSystemLoader
+
+    if 'extends' in meta and meta['extends']:
+        data = '{% extends "' + meta['extends'] + '" %}' + data
+
+    env = Environment(loader=FileSystemLoader(meta['template_dirs']))
+
+    template = env.from_string(data)
+
+    return template.render(meta=meta)
 
 def main(argv=None):
     from os.path import isfile
     from sys import stdin, stdout
 
     from argparse import ArgumentParser
+
+    engines = { 'mako' : render_mako, 'jinja2' : render_jinja2 }
     
     parser = ArgumentParser(description="Render a file using templates.")
     parser.add_argument('-i', '--inputfile', default='-', help='input file')
     parser.add_argument('-f', '--filters', action='append', default=[],
         help='list of filters to apply to input')
+    parser.add_argument('-e', '--engine', default='mako', help='templating engine')
     parser.add_argument('-t', '--template', help='template to apply to input file')
     parser.add_argument('-d', '--template_dirs', default='.', 
         help=': delimited template search path')
@@ -58,6 +76,7 @@ def main(argv=None):
 
     meta['inputfile'] = args.inputfile
     meta['filters'] = [f for l in args.filters for f in l.split(",")]
+    meta['engine'] = args.engine
     meta['extends'] = args.template
     meta['template_dirs'] = args.template_dirs.split(":")
     meta['metafiles'] = args.metafile
@@ -81,7 +100,6 @@ def main(argv=None):
             import markdown
             md = markdown.Markdown(output_format='html5', extensions=['meta'])
             data = md.convert(data)
-            print md.Meta
             for key in md.Meta:
                 meta[key] = " ".join(md.Meta[key])
 
@@ -90,7 +108,7 @@ def main(argv=None):
     else:
         out = open(args.outputfile, 'w')
 
-    out.write(render(data, meta))
+    out.write(engines[meta['engine']](data, meta))
 
 if __name__ == "__main__":
     main()
