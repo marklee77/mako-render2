@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# FIXME: meta style by object?
 
 def render_mako(data, meta):
     from mako.template import Template
@@ -15,13 +16,18 @@ def render_mako(data, meta):
 
     return template.render(meta=meta)
 
+# FIXME: no way to specify output encoding for jinja?
+# jinja requires block?
 def render_jinja2(data, meta):
     from jinja2 import Environment, FileSystemLoader
 
     if 'extends' in meta and meta['extends']:
         data = '{% extends "' + meta['extends'] + '" %}' + data
 
-    env = Environment(loader=FileSystemLoader(meta['template_dirs']))
+    loader = FileSystemLoader(meta['template_dirs'], 
+        encoding=meta['input_encoding'])
+
+    env = Environment(loader=loader)
 
     template = env.from_string(data)
 
