@@ -3,7 +3,25 @@
 # documentation
 # true module structure and upload to pip
 
+from yaml import load as yload
+
 config_file_name = "~/.template_meta.yaml"
+
+def apply_filters(data, meta):
+    for filter in meta['filters']:
+        name, tmp, options = filter.partition(':')
+        options = yload(options)
+
+        if filter in ['md', 'markdown']:
+            import markdown
+            md = markdown.Markdown(output_format='html5', extensions=['meta'])
+            data = md.convert(data)
+            for key in md.Meta:
+                meta[key] = " ".join(md.Meta[key])
+        else:
+            raise SystemExit("error: filter %s not defined" % filter)
+
+    return data
 
 def render_mako(data, meta):
     from mako.template import Template
@@ -47,7 +65,6 @@ def main(argv=None):
 
     from argparse import ArgumentParser
 
-    from yaml import load as yload
     try:
         from yaml import CLoader as YLoader
     except ImportError:
@@ -100,23 +117,23 @@ def main(argv=None):
             name, tmp, value = pair.partition(':')
             meta[name] = yload(value)
 
+    # FIXME: command line options should override meta, but
+    # these things should all still be setable
+    
     meta['inputfile'] = args.inputfile
 
     fsplit = shlex(','.join(args.filters), posix=True)
     fsplit.whitespace=','
     fsplit.whitespace_split = True
     meta['filters'] = list(fsplit)
-
     meta['engine'] = args.engine
     meta['template'] = args.template
     meta['block'] = args.block
     meta['template_dirs'] = args.template_dirs.split(':')
-    meta['metafiles'] = args.metafile
-    # FIXME
-    meta['vars'] = [tuple(v.split(':', 1)) for v in args.var]
-    meta['outputfile'] = args.outputfile
     meta['input_encoding'] = args.input_encoding
     meta['output_encoding'] = args.output_encoding
+
+    meta['outputfile'] = args.outputfile
     
     if meta['inputfile'] == '-':
         fp = stdin
@@ -127,19 +144,8 @@ def main(argv=None):
 
     data = fp.read()
 
-    # FIXME: apply filters function...
-    for filter in meta['filters']:
-        name, tmp, options = filter.partition(':')
-        options = yload(options)
-
-        if filter in ['md', 'markdown']:
-            import markdown
-            md = markdown.Markdown(output_format='html5', extensions=['meta'])
-            data = md.convert(data)
-            for key in md.Meta:
-                meta[key] = " ".join(md.Meta[key])
-        else:
-            raise SystemExit("error: filter %s not defined" % filter)
+    # FIXME: can md suggest extra filters?
+    data = apply_filters(data, meta)
 
     if meta['outputfile'] == '-':
         out = stdout
