@@ -1,12 +1,15 @@
 #!/usr/bin/python
 # FIXME: meta style by object?
+# add ~/.meta.yaml ?
+# default block for jinja
+# do not read stdin by default?
 
 def render_mako(data, meta):
     from mako.template import Template
     from mako.lookup import TemplateLookup
 
-    if 'extends' in meta and meta['extends']:
-        data = '<%inherit file="' + meta['extends'] + '" />' + data
+    if meta['template']:
+        data = '<%inherit file="' + meta['template'] + '" />' + data
 
     lookup = TemplateLookup(meta['template_dirs'])
 
@@ -21,8 +24,8 @@ def render_mako(data, meta):
 def render_jinja2(data, meta):
     from jinja2 import Environment, FileSystemLoader
 
-    if 'extends' in meta and meta['extends']:
-        data = '{% extends "' + meta['extends'] + '" %}' + data
+    if meta['template']:
+        data = '{% extends "' + meta['template'] + '" %}' + data
 
     loader = FileSystemLoader(meta['template_dirs'], 
         encoding=meta['input_encoding'])
@@ -42,13 +45,14 @@ def main(argv=None):
     engines = { 'mako' : render_mako, 'jinja2' : render_jinja2 }
     
     parser = ArgumentParser(description="Render a file using templates.")
-    parser.add_argument('-i', '--inputfile', default='-', help='input file')
+    parser.add_argument('-i', '--inputfile', help='input file')
     parser.add_argument('-f', '--filters', action='append', default=[],
         help='list of filters to apply to input')
     parser.add_argument('-e', '--engine', default='mako', help='templating engine')
-    parser.add_argument('-t', '--template', help='template to apply to input file')
     parser.add_argument('-d', '--template_dirs', default='.', 
         help=': delimited template search path')
+    parser.add_argument('-t', '--template', help='template to apply to input file')
+    parser.add_argument('-b', '--block', help='template block to override')
     parser.add_argument('-m', '--metafile', action='append',
         help='metadata file in yaml format')
     parser.add_argument('-v', '--var', action='append', default=[],
@@ -62,17 +66,25 @@ def main(argv=None):
     args = parser.parse_args()
 
     meta = dict()
+    metafiles = []
+    
+    if isfile('~/.meta.yaml'):
+        metafiles.append('~/.meta.yaml')
 
     if args.metafile:
+        metafiles += args.metafile
+
+    if metafiles:
         from yaml import load as yload
         try:
             from yaml import CLoader as YLoader
         except ImportError:
             from yaml import Loader as YLoader
         for metafile in args.metafile:
-            fp = open(metafile, 'r')
-            meta.update(yload(fp, Loader=YLoader))
-            fp.close()
+            if isfile(metafile):
+                meta.update(yload(open(metafile, 'r'), Loader=YLoader))
+            else:
+                raise SystemExit("error: can't find metafile %s" % metafile)
 
     # FIXME: add fix for \:...
     if args.var:
@@ -83,7 +95,8 @@ def main(argv=None):
     meta['inputfile'] = args.inputfile
     meta['filters'] = [f for l in args.filters for f in l.split(",")]
     meta['engine'] = args.engine
-    meta['extends'] = args.template
+    meta['template'] = args.template
+    meta['block'] = args.block
     meta['template_dirs'] = args.template_dirs.split(":")
     meta['metafiles'] = args.metafile
     meta['vars'] = [tuple(v.split(':')) for v in args.var]
@@ -94,12 +107,15 @@ def main(argv=None):
     if meta['inputfile'] == "-":
         fp = stdin
     elif isfile(meta['inputfile']):
-        fp = open(meta['inputfile'])
+        fp = open(meta['inputfile'], 'r')
     else:
         raise SystemExit("error: can't find %s" % args.inputfile)
 
+    # FIXME: it would be better if we could pass some kind of buffered reader
+    # object
     data = fp.read()
 
+    # FIXME: apply filters function...
     for filter in meta['filters']:
 
         if filter in ['md', 'markdown']:
