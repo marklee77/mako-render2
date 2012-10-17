@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # FIXME: meta style by object?
+# documentation
+# true module structure and upload to pip
 
 config_file_name = "~/.template_meta.yaml"
 
@@ -93,29 +95,30 @@ def main(argv=None):
             else:
                 raise SystemExit("error: can't find metafile %s" % metafile)
 
-    # FIXME: need a better way to compact yaml
     if args.var:
-        for var in args.var:
-            meta.update(yload(re.sub(":", ": ", var)))
+        for pair in args.var:
+            name, tmp, value = pair.partition(':')
+            meta[name] = yload(value)
 
     meta['inputfile'] = args.inputfile
 
-    fsplit = shlex(",".join(args.filters), posix=True)
-    fsplit.whitespace=","
+    fsplit = shlex(','.join(args.filters), posix=True)
+    fsplit.whitespace=','
     fsplit.whitespace_split = True
     meta['filters'] = list(fsplit)
 
     meta['engine'] = args.engine
     meta['template'] = args.template
     meta['block'] = args.block
-    meta['template_dirs'] = args.template_dirs.split(":")
+    meta['template_dirs'] = args.template_dirs.split(':')
     meta['metafiles'] = args.metafile
-    meta['vars'] = [tuple(v.split(':')) for v in args.var]
+    # FIXME
+    meta['vars'] = [tuple(v.split(':', 1)) for v in args.var]
     meta['outputfile'] = args.outputfile
     meta['input_encoding'] = args.input_encoding
     meta['output_encoding'] = args.output_encoding
     
-    if meta['inputfile'] == "-":
+    if meta['inputfile'] == '-':
         fp = stdin
     elif isfile(meta['inputfile']):
         fp = open(meta['inputfile'], 'r')
@@ -126,6 +129,8 @@ def main(argv=None):
 
     # FIXME: apply filters function...
     for filter in meta['filters']:
+        name, tmp, options = filter.partition(':')
+        options = yload(options)
 
         if filter in ['md', 'markdown']:
             import markdown
