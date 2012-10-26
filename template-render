@@ -22,7 +22,7 @@ def apply_filters(data, meta):
                 extensions=['meta'])
             data = md.convert(data)
             for key in md.Meta:
-                meta[key] = md.Meta[key][0]
+                meta[key] = " ".join(md.Meta[key])
         else:
             raise SystemExit("error: filter %s not defined" % filter)
 
