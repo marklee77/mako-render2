@@ -1,5 +1,4 @@
 #!/usr/bin/python
-# FIXME: meta style by object?
 # documentation
 # true module structure and upload to pip
 
@@ -8,16 +7,22 @@ from yaml import load as yload
 config_file_name = "~/.template_meta.yaml"
 
 def apply_filters(data, meta):
-    for filter in meta['filters']:
-        name, tmp, options = filter.partition(':')
-        options = yload(options)
+    from copy import copy
 
-        if filter in ['md', 'markdown']:
+    for filter in meta['filters']:
+
+        mcopy = copy(meta)
+        name, tmp, options = filter.partition(':')
+        if options:
+            mcopy.update(yload(options))
+        
+        if name in ['md', 'markdown']:
             import markdown
-            md = markdown.Markdown(output_format='html5', extensions=['meta'])
+            md = markdown.Markdown(output_format=mcopy['output_format'], 
+                extensions=['meta'])
             data = md.convert(data)
             for key in md.Meta:
-                meta[key] = " ".join(md.Meta[key])
+                meta[key] = md.Meta[key][0]
         else:
             raise SystemExit("error: filter %s not defined" % filter)
 
@@ -105,6 +110,7 @@ def main(argv=None):
     meta['template_dirs'] = ['.']
     meta['input_encoding'] = 'utf-8'
     meta['output_encoding'] = 'utf-8'
+    meta['output_format'] = 'html5'
     meta['outputfile'] = '-'
 
     metafiles = []
@@ -132,10 +138,11 @@ def main(argv=None):
     if args.inputfile:
         meta['inputfile'] = args.inputfile
 
-    fsplit = shlex(','.join(args.filters), posix=True)
-    fsplit.whitespace=','
-    fsplit.whitespace_split = True
-    meta['filters'] = list(fsplit)
+    if len(args.filters) > 0:
+        fsplit = shlex(','.join(args.filters), posix=True)
+        fsplit.whitespace=','
+        fsplit.whitespace_split = True
+        meta['filters'] = list(fsplit)
 
     if args.engine:
         meta['engine'] = args.engine
