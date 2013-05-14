@@ -1,40 +1,9 @@
-#!/usr/bin/python
-# documentation
-# true module structure and upload to pip
+#!/usr/bin/env python
+# can we just yload the doc? or add pandoc metadata support?
 
 from yaml import load as yload
 
 config_file_name = "~/.template_meta.yaml"
-
-def apply_filters(data, meta):
-    from copy import copy
-
-    for filter, options in meta['filters']:
-
-        if filter in ['md', 'markdown']:
-
-            from markdown import Markdown
-
-            output_format = 'html5'
-            extensions = []
-
-            if 'output_format' in options:
-                ouput_format = options['output_format']
-
-            if 'extensions' in options:
-                extensions = options['extensions']
-             
-            md = Markdown(output_format=output_format, extensions=extensions)
-            data = md.convert(data)
-
-            if 'meta' in extensions:
-                for key in md.Meta:
-                    meta[key] = " ".join(md.Meta[key])
-
-        else:
-            raise SystemExit("error: filter %s not defined" % filter)
-
-    return data
 
 def render_mako(data, meta):
     from mako.template import Template
@@ -83,15 +52,10 @@ def main(argv=None):
     except ImportError:
         from yaml import Loader as YLoader
 
-    import re
-    from shlex import shlex
-
     engines = { 'mako' : render_mako, 'jinja2' : render_jinja2 }
     
     parser = ArgumentParser(description="Render a file using templates.")
     parser.add_argument('-i', '--inputfile', help='input file')
-    parser.add_argument('-f', '--filters', 
-                        help='list of filters with options in yaml format')
     parser.add_argument('-e', '--engine', help='templating engine')
     parser.add_argument('-d', '--template_dirs',
                         help=': delimited template search path')
@@ -101,7 +65,7 @@ def main(argv=None):
     parser.add_argument('-m', '--metafile', action='append',
                         help='metadata file in yaml format')
     parser.add_argument('-v', '--var', action='append', default=[],
-                        help='name:value pairs to be added to metadata')
+                        help='name=value pairs to be added to metadata')
     parser.add_argument('-o', '--outputfile', default='-', help='output file')
     parser.add_argument('-ienc', '--input_encoding', help='input encoding')
     parser.add_argument('-oenc', '--output_encoding', help='output encoding')
@@ -111,8 +75,8 @@ def main(argv=None):
     meta = dict()
 
     # defaults...
-    meta['inputfile'] = None
-    meta['engine'] = None
+    meta['inputfile'] = "-"
+    meta['engine'] = 'mako'
     meta['template'] = None
     meta['block'] = None
     meta['template_dirs'] = ['.']
@@ -138,18 +102,12 @@ def main(argv=None):
 
     if args.var:
         for pair in args.var:
-            name, tmp, value = pair.partition(':')
-            meta[name] = yload(value)
+            # FIXME: why not split?
+            name, tmp, value = pair.partition('=')
+            meta[name] = value
 
     if args.inputfile:
         meta['inputfile'] = args.inputfile
-
-    if args.filters:
-        #fsplit = shlex(','.join(args.filters), posix=True)
-        #fsplit.whitespace=','
-        #fsplit.whitespace_split = True
-        #meta['filters'] = list(fsplit)
-        meta['filters'] = yload(args.filters)
 
     if args.engine:
         meta['engine'] = args.engine
@@ -180,9 +138,6 @@ def main(argv=None):
         raise SystemExit("error: can't find %s" % args.inputfile)
 
     data = fp.read()
-
-    # FIXME: can md suggest extra filters?
-    data = apply_filters(data, meta)
 
     if meta['outputfile'] == '-':
         out = stdout
