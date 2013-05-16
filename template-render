@@ -85,7 +85,7 @@ def main(argv=None):
     meta = dict()
 
     # defaults...
-    meta['inputfile'] = "-"
+    meta['inputfile'] = None
     meta['engine'] = 'mako'
     meta['template'] = None
     meta['block'] = None
@@ -139,14 +139,18 @@ def main(argv=None):
     if args.outputfile:
         meta['outputfile'] = args.outputfile
     
-    if meta['inputfile'] == '-':
-        fp = stdin
-    elif isfile(meta['inputfile']):
-        fp = open(meta['inputfile'], 'r')
-    else:
-        raise SystemExit("error: can't find %s" % args.inputfile)
+    fp = None
+    if meta['inputfile']:
+        if meta['inputfile'] == '-':
+            fp = stdin
+        elif isfile(meta['inputfile']):
+            fp = open(meta['inputfile'], 'r')
+        else:
+            raise SystemExit("error: can't find %s" % args.inputfile)
 
-    data = fp.read()
+    data = ""
+    if fp:
+        data = fp.read()
 
     if meta['outputfile'] == '-':
         out = stdout
