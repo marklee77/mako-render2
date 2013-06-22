@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # template-render, a command-line utility for rendering templates
 # Copyright (C) 2013 Mark Lee Stillwell 
 #
